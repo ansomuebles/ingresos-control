@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Gastos e Ingresos - Emprendimiento de Muebles</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Control de Gastos e Ingresos</h1>
+            <h2 class="text-xl text-blue-600 mb-2">Emprendimiento de Muebles</h2>
+            <p class="text-gray-600 mb-4">Sistema completo para el control financiero de tu negocio</p>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center">
+                    <i class="fas fa-wifi text-green-500 mr-2"></i>
+                    <span id="connectionStatus" class="text-sm text-green-600">Conectado - Sincronización en tiempo real</span>
+                </div>
+                <button id="refreshBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                    <i class="fas fa-sync-alt mr-2"></i>Actualizar
+                </button>
+            </div>
+        </div>
+
+        <!-- Métricas principales -->
+        <div class="grid md:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Total Invertido</p>
+                        <p id="totalInvertido" class="text-2xl font-bold text-red-600">$0.00</p>
+                    </div>
+                    <div class="bg-red-100 p-3 rounded-full">
+                        <i class="fas fa-arrow-down text-red-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Ganancia Total</p>
+                        <p id="gananciaTotal" class="text-2xl font-bold text-green-600">$0.00</p>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fas fa-arrow-up text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">ROI</p>
+                        <p id="roi" class="text-2xl font-bold text-blue-600">0%</p>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fas fa-percentage text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Distribución de Inversiones</h3>
+                <div style="height: 300px;">
+                    <canvas id="inversionesChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Ganancias vs Inversiones</h3>
+                <div style="height: 300px;">
+                    <canvas id="comparacionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Registro de Inversiones -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Registro de Inversiones</h3>
+                <button id="agregarInversion" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
+                    <i class="fas fa-plus mr-2"></i>Agregar Inversión
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Fecha</th>
+                            <th class="px-4 py-2 text-left">Material</th>
+                            <th class="px-4 py-2 text-left">Cantidad</th>
+                            <th class="px-4 py-2 text-left">Precio Unit.</th>
+                            <th class="px-4 py-2 text-left">Precio Total</th>
+                            <th class="px-4 py-2 text-left">Proveedor</th>
+                            <th class="px-4 py-2 text-left">Proyecto</th>
+                            <th class="px-4 py-2 text-left">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inversionesTable" class="divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Registro de Ganancias -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Registro de Ganancias</h3>
+                <button id="agregarGanancia" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
+                    <i class="fas fa-plus mr-2"></i>Agregar Ganancia
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Fecha</th>
+                            <th class="px-4 py-2 text-left">Cliente</th>
+                            <th class="px-4 py-2 text-left">Proyecto</th>
+                            <th class="px-4 py-2 text-left">Precio</th>
+                            <th class="px-4 py-2 text-left">Cobrado</th>
+                            <th class="px-4 py-2 text-left">Costo Asociado</th>
+                            <th class="px-4 py-2 text-left">Ganancia Neta</th>
+                            <th class="px-4 py-2 text-left">Estado</th>
+                            <th class="px-4 py-2 text-left">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gananciasTable" class="divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Métricas de Rendimiento -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Métricas de Rendimiento</h3>
+            <div class="grid md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <p id="trabajosCompletados" class="text-2xl font-bold text-blue-600">0</p>
+                    <p class="text-gray-600 text-sm">Trabajos Completados</p>
+                    <p id="promedioTrabajos" class="text-lg text-gray-800">$0</p>
+                </div>
+                <div class="text-center">
+                    <p id="ingresoPromedio" class="text-2xl font-bold text-green-600">$0</p>
+                    <p class="text-gray-600 text-sm">Ingreso Promedio</p>
+                </div>
+                <div class="text-center">
+                    <p id="costoPromedio" class="text-2xl font-bold text-red-600">0%</p>
+                    <p class="text-gray-600 text-sm">Costo Promedio</p>
+                </div>
+                <div class="text-center">
+                    <p id="margenPromedio" class="text-2xl font-bold text-purple-600">0%</p>
+                    <p class="text-gray-600 text-sm">Margen Promedio</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar inversión -->
+    <div id="modalInversion" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold mb-4">Agregar Nueva Inversión</h3>
+                <form id="formInversion">
+                    <input type="date" id="fechaInversion" class="w-full p-2 border rounded mb-3" required>
+                    <input type="text" id="materialInversion" placeholder="Material" class="w-full p-2 border rounded mb-3" required>
+                    <input type="number" id="cantidadInversion" placeholder="Cantidad" class="w-full p-2 border rounded mb-3" required>
+                    <input type="number" id="precioUnitInversion" placeholder="Precio Unitario" step="0.01" class="w-full p-2 border rounded mb-3" required>
+                    <input type="text" id="proveedorInversion" placeholder="Proveedor" class="w-full p-2 border rounded mb-3">
+                    <input type="text" id="proyectoInversion" placeholder="Proyecto" class="w-full p-2 border rounded mb-3">
+                    <div class="flex space-x-3">
+                        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex-1">Guardar</button>
+                        <button type="button" id="cancelarInversion" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex-1">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar ganancia -->
+    <div id="modalGanancia" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold mb-4">Agregar Nueva Ganancia</h3>
+                <form id="formGanancia">
+                    <input type="date" id="fechaGanancia" class="w-full p-2 border rounded mb-3" required>
+                    <input type="text" id="clienteGanancia" placeholder="Cliente" class="w-full p-2 border rounded mb-3" required>
+                    <input type="text" id="proyectoGanancia" placeholder="Proyecto" class="w-full p-2 border rounded mb-3" required>
+                    <input type="number" id="precioGanancia" placeholder="Precio" step="0.01" class="w-full p-2 border rounded mb-3" required>
+                    <input type="number" id="cobradoGanancia" placeholder="Cobrado" step="0.01" class="w-full p-2 border rounded mb-3" required>
+                    <input type="number" id="costoGanancia" placeholder="Costo Asociado" step="0.01" class="w-full p-2 border rounded mb-3" required>
+                    <select id="estadoGanancia" class="w-full p-2 border rounded mb-3" required>
+                        <option value="Completado">Completado</option>
+                        <option value="En Proceso">En Proceso</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Entregado">Entregado</option>
+                    </select>
+                    <div class="flex space-x-3">
+                        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex-1">Guardar</button>
+                        <button type="button" id="cancelarGanancia" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex-1">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "demo-key",
+            authDomain: "demo-project.firebaseapp.com",
+            databaseURL: "https://demo-project-default-rtdb.firebaseio.com",
+            projectId: "demo-project"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Variables globales
+        let inversiones = {};
+        let ganancias = {};
+        let inversionesChart, comparacionChart;
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeData();
+            setupEventListeners();
+            setupFirebaseListeners();
+            initializeCharts();
+        });
+
+        function initializeData() {
+            // Datos iniciales basados en la aplicación original
+            const inversionesIniciales = {
+                'inv1': {
+                    fecha: '2024-01-01',
+                    material: 'Madera',
+                    cantidad: 10,
+                    precioUnit: 25.5,
+                    precioTotal: 255.00,
+                    proveedor: '',
+                    proyecto: ''
+                },
+                'inv2': {
+                    fecha: '2024-01-02',
+                    material: 'Lija',
+                    cantidad: 20,
+                    precioUnit: 0.8,
+                    precioTotal: 16.00,
+                    proveedor: '',
+                    proyecto: ''
+                },
+                'inv3': {
+                    fecha: '2024-01-03',
+                    material: 'Disco de sierra',
+                    cantidad: 3,
+                    precioUnit: 12.5,
+                    precioTotal: 37.50,
+                    proveedor: '',
+                    proyecto: ''
+                },
+                'inv4': {
+                    fecha: '2024-01-04',
+                    material: 'Masilla',
+                    cantidad: 5,
+                    precioUnit: 3,
+                    precioTotal: 15.00,
+                    proveedor: '',
+                    proyecto: ''
+                },
+                'inv5': {
+                    fecha: '2024-01-05',
+                    material: 'Pintura',
+                    cantidad: 2,
+                    precioUnit: 6.15,
+                    precioTotal: 12.30,
+                    proveedor: '',
+                    proyecto: ''
+                }
+            };
+
+            const gananciasIniciales = {
+                'gan1': {
+                    fecha: '2024-01-15',
+                    cliente: 'Cliente 1',
+                    proyecto: 'Mesa comedor',
+                    precio: 350,
+                    cobrado: 350,
+                    costoAsociado: 85,
+                    gananciaNeta: 265.00,
+                    estado: 'Completado'
+                },
+                'gan2': {
+                    fecha: '2024-01-20',
+                    cliente: 'Cliente 2',
+                    proyecto: 'Silla oficina',
+                    precio: 200,
+                    cobrado: 200,
+                    costoAsociado: 45,
+                    gananciaNeta: 155.00,
+                    estado: 'Entregado'
+                },
+                'gan3': {
+                    fecha: '2024-01-25',
+                    cliente: 'Cliente 3',
+                    proyecto: 'Estante',
+                    precio: 180,
+                    cobrado: 180,
+                    costoAsociado: 45,
+                    gananciaNeta: 135.00,
+                    estado: 'Completado'
+                },
+                'gan4': {
+                    fecha: '2024-02-01',
+                    cliente: 'Cliente 4',
+                    proyecto: 'Escritorio',
+                    precio: 280,
+                    cobrado: 280,
+                    costoAsociado: 70,
+                    gananciaNeta: 210.00,
+                    estado: 'En Proceso'
+                },
+                'gan5': {
+                    fecha: '2024-02-05',
+                    cliente: 'Cliente 5',
+                    proyecto: 'Cómoda',
+                    precio: 210,
+                    cobrado: 210,
+                    costoAsociado: 65,
+                    gananciaNeta: 145.00,
+                    estado: 'Pendiente'
+                }
+            };
+
+            // Verificar si existen datos en Firebase, si no, crear datos iniciales
+            database.ref('inversiones').once('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    database.ref('inversiones').set(inversionesIniciales);
+                }
+            });
+
+            database.ref('ganancias').once('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    database.ref('ganancias').set(gananciasIniciales);
+                }
+            });
+        }
+
+        function setupFirebaseListeners() {
+            // Escuchar cambios en inversiones
+            database.ref('inversiones').on('value', (snapshot) => {
+                inversiones = snapshot.val() || {};
+                renderInversiones();
+                updateMetricas();
+                updateCharts();
+            });
+
+            // Escuchar cambios en ganancias
+            database.ref('ganancias').on('value', (snapshot) => {
+                ganancias = snapshot.val() || {};
+                renderGanancias();
+                updateMetricas();
+                updateCharts();
+            });
+
+            // Monitorear conexión
+            database.ref('.info/connected').on('value', (snapshot) => {
+                const connected = snapshot.val();
+                const statusElement = document.getElementById('connectionStatus');
+                if (connected) {
+                    statusElement.textContent = 'Conectado - Sincronización en tiempo real';
+                    statusElement.className = 'text-sm text-green-600';
+                } else {
+                    statusElement.textContent = 'Desconectado - Intentando reconectar...';
+                    statusElement.className = 'text-sm text-red-600';
+                }
+            });
+        }
+
+        function setupEventListeners() {
+            // Modal inversiones
+            document.getElementById('agregarInversion').addEventListener('click', () => {
+                document.getElementById('modalInversion').classList.remove('hidden');
+            });
+
+            document.getElementById('cancelarInversion').addEventListener('click', () => {
+                document.getElementById('modalInversion').classList.add('hidden');
+                document.getElementById('formInversion').reset();
+            });
+
+            document.getElementById('formInversion').addEventListener('submit', (e) => {
+                e.preventDefault();
+                agregarInversion();
+            });
+
+            // Modal ganancias
+            document.getElementById('agregarGanancia').addEventListener('click', () => {
+                document.getElementById('modalGanancia').classList.remove('hidden');
+            });
+
+            document.getElementById('cancelarGanancia').addEventListener('click', () => {
+                document.getElementById('modalGanancia').classList.add('hidden');
+                document.getElementById('formGanancia').reset();
+            });
+
+            document.getElementById('formGanancia').addEventListener('submit', (e) => {
+                e.preventDefault();
+                agregarGanancia();
+            });
+
+            // Botón refresh
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                location.reload();
+            });
+        }
+
+        function agregarInversion() {
+            const fecha = document.getElementById('fechaInversion').value;
+            const material = document.getElementById('materialInversion').value;
+            const cantidad = parseFloat(document.getElementById('cantidadInversion').value);
+            const precioUnit = parseFloat(document.getElementById('precioUnitInversion').value);
+            const proveedor = document.getElementById('proveedorInversion').value;
+            const proyecto = document.getElementById('proyectoInversion').value;
+
+            const nuevaInversion = {
+                fecha,
+                material,
+                cantidad,
+                precioUnit,
+                precioTotal: cantidad * precioUnit,
+                proveedor,
+                proyecto
+            };
+
+            const nuevaKey = database.ref('inversiones').push().key;
+            database.ref(`inversiones/${nuevaKey}`).set(nuevaInversion);
+
+            document.getElementById('modalInversion').classList.add('hidden');
+            document.getElementById('formInversion').reset();
+        }
+
+        function agregarGanancia() {
+            const fecha = document.getElementById('fechaGanancia').value;
+            const cliente = document.getElementById('clienteGanancia').value;
+            const proyecto = document.getElementById('proyectoGanancia').value;
+            const precio = parseFloat(document.getElementById('precioGanancia').value);
+            const cobrado = parseFloat(document.getElementById('cobradoGanancia').value);
+            const costoAsociado = parseFloat(document.getElementById('costoGanancia').value);
+            const estado = document.getElementById('estadoGanancia').value;
+
+            const nuevaGanancia = {
+                fecha,
+                cliente,
+                proyecto,
+                precio,
+                cobrado,
+                costoAsociado,
+                gananciaNeta: cobrado - costoAsociado,
+                estado
+            };
+
+            const nuevaKey = database.ref('ganancias').push().key;
+            database.ref(`ganancias/${nuevaKey}`).set(nuevaGanancia);
+
+            document.getElementById('modalGanancia').classList.add('hidden');
+            document.getElementById('formGanancia').reset();
+        }
+
+        function eliminarInversion(key) {
+            if (confirm('¿Estás seguro de que quieres eliminar esta inversión?')) {
+                database.ref(`inversiones/${key}`).remove();
+            }
+        }
+
+        function eliminarGanancia(key) {
+            if (confirm('¿Estás seguro de que quieres eliminar esta ganancia?')) {
+                database.ref(`ganancias/${key}`).remove();
+            }
+        }
+
+        function renderInversiones() {
+            const tbody = document.getElementById('inversionesTable');
+            tbody.innerHTML = '';
+
+            Object.keys(inversiones).forEach(key => {
+                const inv = inversiones[key];
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-2">${inv.fecha}</td>
+                    <td class="px-4 py-2">${inv.material}</td>
+                    <td class="px-4 py-2">${inv.cantidad}</td>
+                    <td class="px-4 py-2">$${inv.precioUnit.toFixed(2)}</td>
+                    <td class="px-4 py-2">$${inv.precioTotal.toFixed(2)}</td>
+                    <td class="px-4 py-2">${inv.proveedor}</td>
+                    <td class="px-4 py-2">${inv.proyecto}</td>
+                    <td class="px-4 py-2">
+                        <button onclick="eliminarInversion('${key}')" class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function renderGanancias() {
+            const tbody = document.getElementById('gananciasTable');
+            tbody.innerHTML = '';
+
+            Object.keys(ganancias).forEach(key => {
+                const gan = ganancias[key];
+                const estadoClass = {
+                    'Completado': 'bg-green-100 text-green-800',
+                    'En Proceso': 'bg-yellow-100 text-yellow-800',
+                    'Pendiente': 'bg-red-100 text-red-800',
+                    'Entregado': 'bg-blue-100 text-blue-800'
+                };
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-2">${gan.fecha}</td>
+                    <td class="px-4 py-2">${gan.cliente}</td>
+                    <td class="px-4 py-2">${gan.proyecto}</td>
+                    <td class="px-4 py-2">$${gan.precio.toFixed(2)}</td>
+                    <td class="px-4 py-2">$${gan.cobrado.toFixed(2)}</td>
+                    <td class="px-4 py-2">$${gan.costoAsociado.toFixed(2)}</td>
+                    <td class="px-4 py-2">$${gan.gananciaNeta.toFixed(2)}</td>
+                    <td class="px-4 py-2">
+                        <span class="px-2 py-1 rounded-full text-xs ${estadoClass[gan.estado] || 'bg-gray-100 text-gray-800'}">
+                            ${gan.estado}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2">
+                        <button onclick="eliminarGanancia('${key}')" class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateMetricas() {
+            const totalInvertido = Object.values(inversiones).reduce((sum, inv) => sum + inv.precioTotal, 0);
+            const gananciaTotal = Object.values(ganancias).reduce((sum, gan) => sum + gan.gananciaNeta, 0);
+            const roi = totalInvertido > 0 ? ((gananciaTotal / totalInvertido) * 100) : 0;
+
+            document.getElementById('totalInvertido').textContent = `$${totalInvertido.toFixed(2)}`;
+            document.getElementById('gananciaTotal').textContent = `$${gananciaTotal.toFixed(2)}`;
+            document.getElementById('roi').textContent = `${roi.toFixed(1)}%`;
+
+            // Métricas de rendimiento
+            const trabajosCompletados = Object.values(ganancias).filter(g => g.estado === 'Completado').length;
+            const ingresoPromedio = gananciaTotal / Math.max(Object.keys(ganancias).length, 1);
+            const costoPromedio = Object.values(ganancias).reduce((sum, gan) => sum + gan.costoAsociado, 0) / Math.max(Object.keys(ganancias).length, 1);
+            const margenPromedio = Object.values(ganancias).reduce((sum, gan) => sum + (gan.gananciaNeta / gan.precio * 100), 0) / Math.max(Object.keys(ganancias).length, 1);
+
+            document.getElementById('trabajosCompletados').textContent = trabajosCompletados;
+            document.getElementById('promedioTrabajos').textContent = `$${(gananciaTotal / Math.max(trabajosCompletados, 1)).toFixed(0)}`;
+            document.getElementById('ingresoPromedio').textContent = `$${ingresoPromedio.toFixed(0)}`;
+            document.getElementById('costoPromedio').textContent = `$${costoPromedio.toFixed(0)}`;
+            document.getElementById('margenPromedio').textContent = `${margenPromedio.toFixed(1)}%`;
+        }
+
+        function initializeCharts() {
+            // Gráfico de distribución de inversiones
+            const ctx1 = document.getElementById('inversionesChart').getContext('2d');
+            inversionesChart = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                            '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Gráfico de comparación
+            const ctx2 = document.getElementById('comparacionChart').getContext('2d');
+            comparacionChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: ['Inversiones', 'Ganancias'],
+                    datasets: [{
+                        label: 'Monto ($)',
+                        data: [0, 0],
+                        backgroundColor: ['#FF6384', '#36A2EB']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCharts() {
+            // Actualizar gráfico de inversiones
+            const materialesData = {};
+            Object.values(inversiones).forEach(inv => {
+                if (materialesData[inv.material]) {
+                    materialesData[inv.material] += inv.precioTotal;
+                } else {
+                    materialesData[inv.material] = inv.precioTotal;
+                }
+            });
+
+            inversionesChart.data.labels = Object.keys(materialesData);
+            inversionesChart.data.datasets[0].data = Object.values(materialesData);
+            inversionesChart.update();
+
+            // Actualizar gráfico de comparación
+            const totalInvertido = Object.values(inversiones).reduce((sum, inv) => sum + inv.precioTotal, 0);
+            const gananciaTotal = Object.values(ganancias).reduce((sum, gan) => sum + gan.gananciaNeta, 0);
+
+            comparacionChart.data.datasets[0].data = [totalInvertido, gananciaTotal];
+            comparacionChart.update();
+        }
+    </script>
+</body>
+</html>
